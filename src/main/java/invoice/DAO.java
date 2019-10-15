@@ -77,7 +77,77 @@ public class DAO {
 	 * @throws java.lang.Exception si la transaction a échoué
 	 */
 	public void createInvoice(CustomerEntity customer, int[] productIDs, int[] quantities) throws Exception {
-		throw new UnsupportedOperationException("Pas encore implémenté");
+		
+                                            String sql1 = "INSERT INTO Invoice (ID ,CustomerID ,Total) VALUES(?,?,0) "; // Commande sqlpour Invoice
+                                            String sql2 = "INSERT INTO Item (InvoiceID, Item, ProductID, Quantity, Cost) VALUES(?,?,?,?,?)";// Commande sql pour Item
+                                            String sql3 = "SELECT Price AS PRIX FROM Product WHERE ID = ?";// Commande sql pour Product
+                                            
+                                            
+                                            try (
+                                                                  Connection connect = myDataSource.getConnection(); // Ouvrir une connexion
+                                                                  
+                                                                   // On précompile les requêtes SQL
+			PreparedStatement stmt1 = connect.prepareStatement(sql1,Statement.RETURN_GENERATED_KEYS); 
+                                                                  PreparedStatement stmt2 = connect.prepareStatement(sql2);
+                                                                  PreparedStatement stmt3 = connect.prepareStatement(sql3);
+                                                                 // Un ResultSet pour parcourir les enregistrements du résultat
+                                                                  ResultSet resultSet = stmt3.executeQuery();
+		){              
+                                                                 // Début de la transaction 
+                                                                 connect.setAutoCommit(false);
+                                                                 try{
+                                                                                       // On remplit d'abord la table Invoice : on rentre la clé auto-générer et l'id du client
+                                                                                       stmt1.setInt(1, customer.getCustomerId());
+                                                                                       // Execution de la réquêtre et vérification de l'auto génération de la clé :
+                                                                                       int mise1 = stmt1.executeUpdate();
+                                                                                       if(mise1 != 1){
+                                                                                                             throw new Exception("Aucune valeur insérer.");
+                                                                                       }
+                                                                                       // Récupération de la clé automatiquement généré:
+                                                                                       int clef = stmt1.getGeneratedKeys().getInt(1);
+                                                                                       
+                                                                                       // Une fois les étapes précedente effectué on remplit la table Item pour pouvoir récupérer chaque ligne de la facture
+                                                                                       // Boucle for : attention cette étape nescessite que les deux tableau en paramètre soit de même longueur
+                                                                                       if(productIDs.length != quantities.length){ // Vérification taille des tableaux
+                                                                                                             throw new Exception("Les deux tableaux ne sont pas de la même taille.");
+                                                                                       }
+                                                                                       
+                                                                                       for(int i = 0 ; i < quantities.length; i++){
+                                                                                                             // Début de l'ajout des valeur dans Item
+                                                                                                             stmt2.setInt(1, clef);
+                                                                                                             stmt2.setInt(2, i);
+                                                                                                             stmt2.setInt(3, productIDs[i]);
+                                                                                                             stmt2.setInt(4, quantities[i]);
+                                                                                                             
+                                                                                                             // Récupération du prix dans la table Product
+                                                                                                             stmt3.setInt(1, productIDs[i]);
+                                                                                                             float prix = 0f;
+                                                                                                             if(resultSet.next()){
+                                                                                                                                   prix = resultSet.getFloat("PRIX");
+                                                                                                             }
+                                                                                                             
+                                                                                                             // Fin de l'ajout des valeur dans Item
+                                                                                                             stmt2.setFloat(5, prix);
+                                                                                                             int mise2 = stmt2.executeUpdate();
+                                                                                                              if(mise2 != 1){
+                                                                                                                                    throw new Exception("Aucune valeur insérer.");
+                                                                                                              }
+                                                                                                             
+                                                                                                             
+                                                                                        }
+                                                                                       
+                                                                                       // Valide la transaction
+                                                                                        connect.commit();
+                                                                                        
+                                                                  }catch (Exception ex) {
+                                                                                        connect.rollback(); // On annule la transaction
+                                                                                        throw ex;
+                                                                 } finally { 
+                                                                                        // On revient au mode de fonctionnement sans transaction
+                                                                                        connect .setAutoCommit(true);
+                                                                  }
+                                            }
+                                                                 
 	}
 
 	/**
